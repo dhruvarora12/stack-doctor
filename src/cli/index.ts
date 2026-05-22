@@ -10,6 +10,8 @@ import type { CliOptions, DetectionResult } from '../types/index.js';
 import type { CacheAnalysisResult, Finding, FindingSeverity, QueueAnalysisResult } from '../types/findings.js';
 import type { ScanResult } from '../types/scan.js';
 import type { KeyScanResult, LiveRedisResult, QueueScanResult } from '../types/live.js';
+import { analyzeCrossModes } from '../core/cross-mode.js';
+import type { CrossModeResult } from '../types/cross-mode.js';
 
 const program = new Command();
 
@@ -134,17 +136,27 @@ program
       }
     }
 
+    const crossModeResult: CrossModeResult | null =
+      liveResult !== null
+        ? analyzeCrossModes(
+            cacheResult ?? { findings: [], filesAnalyzed: 0, disclaimer: '' },
+            queueResult ?? { findings: [], filesAnalyzed: 0, disclaimer: '', advisories: [] },
+            liveResult,
+            result,
+          )
+        : null;
+
     if (isAutoMode) {
       const filename = `stack-doctor-report-${date}.md`;
       const filepath = join(resolve(targetPath), filename);
-      const md = buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, summary, options, date);
+      const md = buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, summary, options, date);
       await writeFile(filepath, md, 'utf-8');
       const rel = './' + relative(process.cwd(), filepath).replace(/\\/g, '/');
       console.log(`Report saved to ${rel}`);
       return;
     }
 
-    printReport(result, scanResult, cacheResult, queueResult, liveResult, summary, options, date);
+    printReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, summary, options, date);
   });
 
 program.parse();
@@ -316,6 +328,7 @@ function buildMarkdownReport(
   cacheResult: CacheAnalysisResult | null,
   queueResult: QueueAnalysisResult | null,
   liveResult: LiveRedisResult | null,
+  crossModeResult: CrossModeResult | null,
   summary: ReportSummary,
   options: CliOptions,
   date: string,
@@ -399,6 +412,11 @@ function buildMarkdownReport(
       }
       lines.push(`> ${queueResult.disclaimer}`);
     }
+  }
+
+  // ── Insights (cross-mode, only when live ran) ──
+  if (liveResult !== null) {
+    lines.push(...buildInsightsMarkdownLines(crossModeResult));
   }
 
   // ── Live section (after static, per Bucket 6a) ──
@@ -521,6 +539,7 @@ function printReport(
   cacheResult: CacheAnalysisResult | null,
   queueResult: QueueAnalysisResult | null,
   liveResult: LiveRedisResult | null,
+  crossModeResult: CrossModeResult | null,
   summary: ReportSummary,
   options: CliOptions,
   date: string,
@@ -581,6 +600,9 @@ function printReport(
                 },
               }
             : {}),
+          ...(crossModeResult !== null
+            ? { crossModeAnalysis: crossModeResult }
+            : {}),
         },
         null,
         2,
@@ -590,7 +612,7 @@ function printReport(
   }
 
   if (options.output === 'markdown') {
-    console.log(buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, summary, options, date));
+    console.log(buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, summary, options, date));
     return;
   }
 
@@ -662,6 +684,11 @@ function printReport(
         queueResult.advisories,
       );
     }
+  }
+
+  // ── Insights (cross-mode, only when live ran) ──
+  if (liveResult !== null) {
+    printInsightsSection(crossModeResult);
   }
 
   // ── Live section (after static, per Bucket 6a) ──
@@ -838,6 +865,41 @@ function buildQueueScanMarkdownLines(qs: QueueScanResult | null): string[] {
     for (const w of allWarnings) lines.push(`> ! ${w}`);
   }
 
+  return lines;
+}
+
+function printInsightsSection(cm: CrossModeResult | null): void {
+  if (cm === null) return;
+  console.log('\nInsights\n');
+  if (cm.insights.length === 0) {
+    console.log('  No cross-mode insights.');
+    console.log('');
+    return;
+  }
+  for (const insight of cm.insights) {
+    const icon =
+      insight.kind === 'all-clear'   ? '✓' :
+      insight.kind === 'new-finding' ? '!' : '⚠';
+    console.log(`  ${icon} ${insight.title}`);
+    console.log(`    ${insight.detail}`);
+    console.log('');
+  }
+}
+
+function buildInsightsMarkdownLines(cm: CrossModeResult | null): string[] {
+  if (cm === null) return [];
+  const lines: string[] = [];
+  lines.push('', '## Insights', '');
+  if (cm.insights.length === 0) {
+    lines.push('No cross-mode insights.');
+    return lines;
+  }
+  for (const insight of cm.insights) {
+    const icon =
+      insight.kind === 'all-clear'   ? '✓' :
+      insight.kind === 'new-finding' ? '!' : '⚠';
+    lines.push(`- ${icon} **${insight.title}** — ${insight.detail}`);
+  }
   return lines;
 }
 

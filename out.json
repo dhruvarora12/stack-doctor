@@ -15,10 +15,10 @@
   ],
   "warnings": [],
   "scanStats": {
-    "totalFiles": 19,
-    "parsedFiles": 19,
+    "totalFiles": 21,
+    "parsedFiles": 21,
     "skippedFiles": 0,
-    "durationMs": 86
+    "durationMs": 76
   },
   "filesWithImports": [
     {
@@ -73,7 +73,7 @@
   "liveAnalysis": {
     "host": "redis://127.0.0.1:6379",
     "redisVersion": "3.0.504",
-    "uptimeSeconds": 57888,
+    "uptimeSeconds": 60863,
     "connectedClients": 1,
     "memory": {
       "usedBytes": 692376,
@@ -157,5 +157,11 @@
         "100.0% of sampled keys have no TTL — consider setting expiry to prevent unbounded growth"
       ]
     }
+  },
+  "crossModeAnalysis": {
+    "insights": [],
+    "confirmedCount": 0,
+    "contradictedCount": 0,
+    "newFindingCount": 0
   }
 }
