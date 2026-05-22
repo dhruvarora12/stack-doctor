@@ -4,6 +4,7 @@ export type { ImportStyle, ImportRecord, SkippedFile, ScannedFile, ScanStats, Sc
 export type { FindingSeverity, FindingRule, Finding, CacheAnalysisResult, QueueAnalysisResult } from './findings.js';
 export type { LiveRedisResult, ScannedKey, NamespaceEntry, KeyScanResult, QueueScanEntry, QueueScanResult } from './live.js';
 export type { CrossModeInsightKind, CrossModeInsight, CrossModeResult } from './cross-mode.js';
+export type { Recommendation, RecommendationsResult } from './recommendations.js';
 
 export interface DetectedClient {
   name: string;

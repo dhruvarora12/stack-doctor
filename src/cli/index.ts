@@ -12,6 +12,8 @@ import type { ScanResult } from '../types/scan.js';
 import type { KeyScanResult, LiveRedisResult, QueueScanResult } from '../types/live.js';
 import { analyzeCrossModes } from '../core/cross-mode.js';
 import type { CrossModeResult } from '../types/cross-mode.js';
+import { buildRecommendations } from '../core/recommendations.js';
+import type { RecommendationsResult } from '../types/recommendations.js';
 
 const program = new Command();
 
@@ -146,17 +148,24 @@ program
           )
         : null;
 
+    const recommendationsResult = buildRecommendations(
+      cacheResult,
+      queueResult,
+      liveResult,
+      crossModeResult,
+    );
+
     if (isAutoMode) {
       const filename = `stack-doctor-report-${date}.md`;
       const filepath = join(resolve(targetPath), filename);
-      const md = buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, summary, options, date);
+      const md = buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, recommendationsResult, summary, options, date);
       await writeFile(filepath, md, 'utf-8');
       const rel = './' + relative(process.cwd(), filepath).replace(/\\/g, '/');
       console.log(`Report saved to ${rel}`);
       return;
     }
 
-    printReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, summary, options, date);
+    printReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, recommendationsResult, summary, options, date);
   });
 
 program.parse();
@@ -329,6 +338,7 @@ function buildMarkdownReport(
   queueResult: QueueAnalysisResult | null,
   liveResult: LiveRedisResult | null,
   crossModeResult: CrossModeResult | null,
+  recommendationsResult: RecommendationsResult,
   summary: ReportSummary,
   options: CliOptions,
   date: string,
@@ -345,6 +355,7 @@ function buildMarkdownReport(
   lines.push('# Stack Doctor Report', '');
   lines.push(`_Generated: ${date}_`, '');
   lines.push(formatGradeLine(summary), '');
+  lines.push(...buildActionPlanMarkdownLines(recommendationsResult));
 
   // ── Libraries + scan stats ──
   lines.push('## Detected Libraries', '');
@@ -540,6 +551,7 @@ function printReport(
   queueResult: QueueAnalysisResult | null,
   liveResult: LiveRedisResult | null,
   crossModeResult: CrossModeResult | null,
+  recommendationsResult: RecommendationsResult,
   summary: ReportSummary,
   options: CliOptions,
   date: string,
@@ -603,6 +615,7 @@ function printReport(
           ...(crossModeResult !== null
             ? { crossModeAnalysis: crossModeResult }
             : {}),
+          actionPlan: recommendationsResult,
         },
         null,
         2,
@@ -612,13 +625,14 @@ function printReport(
   }
 
   if (options.output === 'markdown') {
-    console.log(buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, summary, options, date));
+    console.log(buildMarkdownReport(result, scanResult, cacheResult, queueResult, liveResult, crossModeResult, recommendationsResult, summary, options, date));
     return;
   }
 
   // ── Text ──────────────────────────────────────────────────────────────────
   console.log('\nStack Doctor — Static Analysis\n');
   console.log(formatGradeLine(summary));
+  printActionPlanSection(recommendationsResult);
   console.log(`\nScanned: ${result.packageJsonPath ?? 'unknown'}\n`);
 
   if (clients.length === 0) {
@@ -900,6 +914,83 @@ function buildInsightsMarkdownLines(cm: CrossModeResult | null): string[] {
       insight.kind === 'new-finding' ? '!' : '⚠';
     lines.push(`- ${icon} **${insight.title}** — ${insight.detail}`);
   }
+  return lines;
+}
+
+function printActionPlanSection(rec: RecommendationsResult): void {
+  if (rec.totalCount === 0) return;
+  console.log('\nAction Plan\n');
+
+  // ⚡ Quick Wins sub-section
+  if (rec.quickWins.length > 0) {
+    console.log('  ⚡ Quick Wins\n');
+    for (const r of rec.quickWins) {
+      const liveTag = r.confirmedByLive ? '  (confirmed by live data)' : '';
+      console.log(`  ${r.title}${liveTag}`);
+      console.log(`    Why: ${r.why}`);
+      console.log(`    Fix: ${r.fix}`);
+      console.log('');
+    }
+  }
+
+  // Priority groups
+  const groups: Array<{ label: string; priority: 1 | 2 | 3 }> = [
+    { label: 'Priority 1 — Fix Now',  priority: 1 },
+    { label: 'Priority 2 — Fix Soon', priority: 2 },
+    { label: 'Priority 3 — Consider', priority: 3 },
+  ];
+
+  for (const { label, priority } of groups) {
+    const items = rec.recommendations.filter((r) => r.priority === priority);
+    if (items.length === 0) continue;
+    console.log(`  ${label}\n`);
+    for (const r of items) {
+      const liveTag = r.confirmedByLive ? '  [confirmed by live data]' : '';
+      console.log(`  [${r.effort.toUpperCase()}]  ${r.title}${liveTag}`);
+      console.log(`    Why: ${r.why}`);
+      console.log(`    Fix: ${r.fix}`);
+      console.log('');
+    }
+  }
+}
+
+function buildActionPlanMarkdownLines(rec: RecommendationsResult): string[] {
+  if (rec.totalCount === 0) return [];
+  const lines: string[] = [];
+  lines.push('', '## Action Plan', '');
+
+  // ⚡ Quick Wins sub-section
+  if (rec.quickWins.length > 0) {
+    lines.push('### ⚡ Quick Wins', '');
+    for (const r of rec.quickWins) {
+      const liveTag = r.confirmedByLive ? ' _(confirmed by live data)_' : '';
+      lines.push(`**${r.title}**${liveTag}  `);
+      lines.push(`Why: ${r.why}  `);
+      lines.push(`Fix: \`${r.fix}\``);
+      lines.push('');
+    }
+  }
+
+  // Priority groups
+  const groups: Array<{ label: string; priority: 1 | 2 | 3 }> = [
+    { label: 'Priority 1 — Fix Now',  priority: 1 },
+    { label: 'Priority 2 — Fix Soon', priority: 2 },
+    { label: 'Priority 3 — Consider', priority: 3 },
+  ];
+
+  for (const { label, priority } of groups) {
+    const items = rec.recommendations.filter((r) => r.priority === priority);
+    if (items.length === 0) continue;
+    lines.push(`### ${label}`, '');
+    for (const r of items) {
+      const liveTag = r.confirmedByLive ? ' _(confirmed by live data)_' : '';
+      lines.push(`**[${r.effort.toUpperCase()}] ${r.title}**${liveTag}  `);
+      lines.push(`Why: ${r.why}  `);
+      lines.push(`Fix: \`${r.fix}\``);
+      lines.push('');
+    }
+  }
+
   return lines;
 }
 

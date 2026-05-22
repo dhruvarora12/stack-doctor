@@ -1,32 +1,32 @@
 {
   "summary": {
     "errors": 0,
-    "warnings": 0,
-    "filesAffected": 0,
-    "totalFindings": 0
+    "warnings": 3,
+    "filesAffected": 1,
+    "totalFindings": 3
   },
   "clients": [
     {
-      "name": "ioredis",
-      "version": "^5.10.1",
-      "category": "redis-client",
+      "name": "bullmq",
+      "version": "^5.76.10",
+      "category": "redis-queue",
       "isDirect": true
     }
   ],
   "warnings": [],
   "scanStats": {
-    "totalFiles": 21,
-    "parsedFiles": 21,
+    "totalFiles": 2,
+    "parsedFiles": 2,
     "skippedFiles": 0,
-    "durationMs": 76
+    "durationMs": 11
   },
   "filesWithImports": [
     {
-      "path": "C:\\Users\\arora\\OneDrive\\Desktop\\npx-custom-package\\src\\core\\live-redis.ts",
+      "path": "C:\\Users\\arora\\AppData\\Local\\Temp\\bullmq-test\\src\\queue.ts",
       "imports": [
         {
-          "library": "ioredis",
-          "localName": "Redis",
+          "library": "bullmq",
+          "localName": "Queue",
           "importStyle": "named",
           "line": 1,
           "column": 0
@@ -34,23 +34,11 @@
       ]
     },
     {
-      "path": "C:\\Users\\arora\\OneDrive\\Desktop\\npx-custom-package\\src\\core\\scan-keys.ts",
+      "path": "C:\\Users\\arora\\AppData\\Local\\Temp\\bullmq-test\\src\\worker.ts",
       "imports": [
         {
-          "library": "ioredis",
-          "localName": "Redis",
-          "importStyle": "named",
-          "line": 1,
-          "column": 0
-        }
-      ]
-    },
-    {
-      "path": "C:\\Users\\arora\\OneDrive\\Desktop\\npx-custom-package\\src\\core\\scan-queues.ts",
-      "imports": [
-        {
-          "library": "ioredis",
-          "localName": "Redis",
+          "library": "bullmq",
+          "localName": "Worker",
           "importStyle": "named",
           "line": 1,
           "column": 0
@@ -61,107 +49,83 @@
   "skippedFiles": [],
   "cacheAnalysis": {
     "findings": [],
-    "filesAnalyzed": 3,
+    "filesAnalyzed": 2,
     "disclaimer": "Findings are based on static analysis and may include false positives. Review each before acting."
   },
   "queueAnalysis": {
-    "findings": [],
-    "filesAnalyzed": 0,
+    "findings": [
+      {
+        "rule": "queue-no-remove-on-complete",
+        "severity": "warn",
+        "file": "C:\\Users\\arora\\AppData\\Local\\Temp\\bullmq-test\\src\\queue.ts",
+        "line": 2,
+        "column": 19,
+        "message": "removeOnComplete not configured — completed jobs will accumulate in Redis indefinitely.",
+        "library": "bullmq",
+        "fix": "defaultJobOptions: { removeOnComplete: { count: 100 } }",
+        "codeSnippet": "const emailQueue = new Queue('email', {"
+      },
+      {
+        "rule": "queue-no-remove-on-fail",
+        "severity": "warn",
+        "file": "C:\\Users\\arora\\AppData\\Local\\Temp\\bullmq-test\\src\\queue.ts",
+        "line": 2,
+        "column": 19,
+        "message": "removeOnFail not configured — failed jobs will accumulate in Redis indefinitely.",
+        "library": "bullmq",
+        "fix": "defaultJobOptions: { removeOnFail: { count: 50 } }",
+        "codeSnippet": "const emailQueue = new Queue('email', {"
+      },
+      {
+        "rule": "queue-missing-timeout",
+        "severity": "warn",
+        "file": "C:\\Users\\arora\\AppData\\Local\\Temp\\bullmq-test\\src\\queue.ts",
+        "line": 2,
+        "column": 19,
+        "message": "No job timeout in defaultJobOptions — jobs can hang indefinitely if they stall.",
+        "library": "bullmq",
+        "fix": "defaultJobOptions: { timeout: 30000 }",
+        "codeSnippet": "const emailQueue = new Queue('email', {"
+      }
+    ],
+    "filesAnalyzed": 2,
     "disclaimer": "Findings are based on static analysis and may include false positives. Review each before acting.",
     "advisories": []
   },
-  "liveAnalysis": {
-    "host": "redis://127.0.0.1:6379",
-    "redisVersion": "3.0.504",
-    "uptimeSeconds": 60863,
-    "connectedClients": 1,
-    "memory": {
-      "usedBytes": 692376,
-      "usedHuman": "676.15K",
-      "maxBytes": 0,
-      "maxHuman": "0B",
-      "usagePercent": 0,
-      "fragmentationRatio": 0.92,
-      "evictionPolicy": "noeviction"
-    },
-    "keyspace": {
-      "totalKeys": 9,
-      "keysWithTtl": 0,
-      "keysWithoutTtl": 9,
-      "databases": [
-        {
-          "db": 0,
-          "keys": 9,
-          "expires": 0
-        }
-      ]
-    },
-    "cacheHitRate": 84.21,
-    "warnings": [
-      "No maxmemory limit set — Redis may grow unbounded"
+  "actionPlan": {
+    "recommendations": [
+      {
+        "priority": 2,
+        "title": "Enable removeOnComplete on queues",
+        "why": "Completed jobs accumulate in Redis indefinitely, consuming memory and slowing queue operations.",
+        "fix": "Add to defaultJobOptions: { removeOnComplete: { count: 100 } }",
+        "effort": "low",
+        "relatedRule": "queue-no-remove-on-complete",
+        "confirmedByLive": false
+      },
+      {
+        "priority": 2,
+        "title": "Enable removeOnFail on queues",
+        "why": "Failed jobs accumulate in Redis indefinitely. Without a cap, the failed set grows unbounded.",
+        "fix": "Add to defaultJobOptions: { removeOnFail: { count: 50 } }",
+        "effort": "low",
+        "relatedRule": "queue-no-remove-on-fail",
+        "confirmedByLive": false
+      },
+      {
+        "priority": 2,
+        "title": "Set job timeout on queues",
+        "why": "Jobs without a timeout can hang forever, blocking workers and causing the queue to stall.",
+        "fix": "Add to defaultJobOptions: { timeout: 30000 } (adjust to your expected max job duration)",
+        "effort": "low",
+        "relatedRule": "queue-missing-timeout",
+        "confirmedByLive": false
+      }
     ],
-    "queueScan": {
-      "queues": [
-        {
-          "name": "emailQueue",
-          "waiting": 5,
-          "active": 2,
-          "completed": 3,
-          "failed": 2,
-          "delayed": 1,
-          "hasStalled": false,
-          "warnings": [
-            "Queue \"emailQueue\" has 2 failed jobs"
-          ]
-        },
-        {
-          "name": "notifQueue",
-          "waiting": 1,
-          "active": 0,
-          "completed": 0,
-          "failed": 3,
-          "delayed": 0,
-          "hasStalled": true,
-          "warnings": [
-            "Queue \"notifQueue\" has 3 failed jobs",
-            "Queue \"notifQueue\" has stalled jobs"
-          ]
-        }
-      ],
-      "totalFailed": 5,
-      "totalWaiting": 6,
-      "warnings": []
-    },
-    "keyScan": {
-      "scanned": 9,
-      "noTtlCount": 9,
-      "noTtlPercent": 100,
-      "idleKeys": [],
-      "oversizedKeys": [],
-      "namespaces": [
-        {
-          "prefix": "bull:",
-          "keyCount": 8,
-          "memoryBytes": 0,
-          "memoryPercent": 0
-        },
-        {
-          "prefix": "user:",
-          "keyCount": 1,
-          "memoryBytes": 0,
-          "memoryPercent": 0
-        }
-      ],
-      "truncated": false,
-      "warnings": [
-        "100.0% of sampled keys have no TTL — consider setting expiry to prevent unbounded growth"
-      ]
-    }
-  },
-  "crossModeAnalysis": {
-    "insights": [],
-    "confirmedCount": 0,
-    "contradictedCount": 0,
-    "newFindingCount": 0
+    "quickWins": [],
+    "totalCount": 3,
+    "priority1Count": 0,
+    "priority2Count": 3,
+    "priority3Count": 0
   }
 }

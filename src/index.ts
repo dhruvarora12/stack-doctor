@@ -3,9 +3,11 @@ export type { ImportStyle, ImportRecord, SkippedFile, ScannedFile, ScanStats, Sc
 export type { FindingSeverity, FindingRule, Finding, CacheAnalysisResult, QueueAnalysisResult } from './types/findings.js';
 export type { LiveRedisResult, ScannedKey, NamespaceEntry, KeyScanResult, QueueScanEntry, QueueScanResult } from './types/live.js';
 export type { CrossModeInsightKind, CrossModeInsight, CrossModeResult } from './types/cross-mode.js';
+export type { Recommendation, RecommendationsResult } from './types/recommendations.js';
 export { detectProject } from './core/detect.js';
 export { scanFiles, getAst } from './core/scanner.js';
 export { analyzeCache } from './core/analyze-cache.js';
 export { analyzeQueue } from './core/analyze-queue.js';
 export { analyzeLive } from './core/live-redis.js';
 export { analyzeCrossModes } from './core/cross-mode.js';
+export { buildRecommendations } from './core/recommendations.js';
