@@ -10,10 +10,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dhruvarora12/stack-doctor"
+    "url": "git+https://github.com/dhruvarora12/stack-doctor.git"
   },
   "bin": {
-    "stack-doctor": "./dist/cli/index.js"
+    "stack-doctor": "dist/cli/index.js"
   },
   "exports": {
     ".": "./dist/index.js"
